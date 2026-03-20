@@ -45,6 +45,10 @@ jobs:
           script: |
             sudo mkdir -p /opt/finops
             sudo chown ec2-user:ec2-user /opt/finops
+            # Java 17 설치 (없는 경우에만)
+            if ! java -version 2>&1 | grep -q '17'; then
+              sudo dnf install -y java-17-amazon-corretto-headless
+            fi
 
       # 6. EC2에 JAR 전송
       - name: SCP JAR to EC2
@@ -76,6 +80,27 @@ jobs:
 
             # JAR 이름 표준화
             mv /opt/finops/*-SNAPSHOT.jar /opt/finops/finops.jar 2>/dev/null || true
+
+            # systemd 서비스 파일 생성 (없으면 등록)
+            sudo tee /etc/systemd/system/finops.service > /dev/null << 'EOF'
+            [Unit]
+            Description=FinOps Spring Boot App
+            After=network.target
+
+            [Service]
+            User=ec2-user
+            EnvironmentFile=/opt/finops/.env
+            ExecStart=/usr/bin/java -jar -Dspring.profiles.active=prod /opt/finops/finops.jar
+            SuccessExitStatus=143
+            Restart=on-failure
+            RestartSec=10
+
+            [Install]
+            WantedBy=multi-user.target
+            EOF
+
+            sudo systemctl daemon-reload
+            sudo systemctl enable finops
 
             # 서비스 재시작
             sudo systemctl restart finops
