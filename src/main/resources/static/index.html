@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>FinOps Dashboard</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: #e2e8f0; min-height: 100vh; }
+
+  .header { background: #1e293b; padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #334155; }
+  .header h1 { font-size: 20px; color: #38bdf8; font-weight: 700; }
+  .header .user-info { font-size: 13px; color: #94a3b8; }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 32px 16px; }
+
+  /* 탭 */
+  .tabs { display: flex; gap: 4px; margin-bottom: 24px; }
+  .tab { padding: 8px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; color: #94a3b8; background: #1e293b; border: 1px solid #334155; transition: all .2s; }
+  .tab.active { background: #38bdf8; color: #0f172a; font-weight: 600; border-color: #38bdf8; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* 카드 */
+  .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; margin-bottom: 16px; }
+  .card h2 { font-size: 16px; color: #94a3b8; margin-bottom: 16px; text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
+
+  /* 폼 */
+  .form-group { margin-bottom: 14px; }
+  .form-group label { display: block; font-size: 13px; color: #94a3b8; margin-bottom: 6px; }
+  .form-group input, .form-group select { width: 100%; padding: 9px 12px; background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: #e2e8f0; font-size: 14px; outline: none; }
+  .form-group input:focus, .form-group select:focus { border-color: #38bdf8; }
+
+  .btn { padding: 10px 24px; border-radius: 6px; border: none; cursor: pointer; font-size: 14px; font-weight: 600; transition: opacity .2s; }
+  .btn:hover { opacity: .85; }
+  .btn-primary { background: #38bdf8; color: #0f172a; }
+  .btn-danger { background: #f43f5e; color: #fff; }
+  .btn-sm { padding: 6px 14px; font-size: 13px; }
+
+  /* 응답 박스 */
+  .response-box { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 16px; margin-top: 16px; font-size: 13px; font-family: monospace; white-space: pre-wrap; max-height: 300px; overflow-y: auto; color: #86efac; }
+  .response-box.error { color: #fca5a5; }
+
+  /* 비용 요약 */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px; }
+  .stat-card { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 16px; text-align: center; }
+  .stat-card .value { font-size: 28px; font-weight: 700; color: #38bdf8; }
+  .stat-card .label { font-size: 12px; color: #64748b; margin-top: 4px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th { text-align: left; padding: 10px 12px; color: #64748b; font-size: 12px; text-transform: uppercase; border-bottom: 1px solid #334155; }
+  td { padding: 10px 12px; border-bottom: 1px solid #1e293b; }
+  tr:hover td { background: #1e293b; }
+
+  /* 채팅 */
+  .chat-messages { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 16px; height: 320px; overflow-y: auto; margin-bottom: 12px; display: flex; flex-direction: column; gap: 12px; }
+  .msg { max-width: 80%; padding: 10px 14px; border-radius: 10px; font-size: 14px; line-height: 1.5; }
+  .msg.user { align-self: flex-end; background: #0369a1; color: #fff; }
+  .msg.bot { align-self: flex-start; background: #1e293b; color: #cbd5e1; border: 1px solid #334155; }
+  .chat-input-row { display: flex; gap: 8px; }
+  .chat-input-row input { flex: 1; padding: 10px 14px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; font-size: 14px; outline: none; }
+  .chat-input-row input:focus { border-color: #38bdf8; }
+
+  /* AWS 연동 Wizard */
+  .wizard-step { display: none; }
+  .wizard-step.active { display: block; }
+  .step-indicator { display: flex; align-items: center; gap: 0; margin-bottom: 24px; }
+  .step-dot { width: 32px; height: 32px; border-radius: 50%; background: #334155; color: #64748b; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; flex-shrink: 0; }
+  .step-dot.active { background: #38bdf8; color: #0f172a; }
+  .step-dot.done { background: #22c55e; color: #fff; }
+  .step-line { flex: 1; height: 2px; background: #334155; }
+  .step-line.done { background: #22c55e; }
+  .step-label { font-size: 11px; color: #64748b; text-align: center; margin-top: 4px; }
+  .cfn-box { background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 14px; font-size: 12px; font-family: monospace; white-space: pre; overflow-x: auto; max-height: 260px; overflow-y: auto; color: #93c5fd; }
+  .status-badge { display: inline-block; padding: 3px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+  .status-badge.CONNECTED { background: #166534; color: #86efac; }
+  .status-badge.PENDING { background: #713f12; color: #fde68a; }
+  .status-badge.FAILED { background: #7f1d1d; color: #fca5a5; }
+
+  /* 토큰 뱃지 */
+  .token-badge { display: inline-block; background: #166534; color: #86efac; padding: 2px 10px; border-radius: 999px; font-size: 12px; }
+
+  .row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+  .row .form-group { flex: 1; min-width: 150px; }
+  .spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid #334155; border-top-color: #38bdf8; border-radius: 50%; animation: spin .6s linear infinite; margin-right: 6px; vertical-align: middle; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>⚡ FinOps Dashboard</h1>
+  <div class="user-info">
+    <span id="tokenStatus">로그인 필요</span>
+    <button id="logoutBtn" class="btn btn-danger btn-sm" style="display:none; margin-left:12px;" onclick="logout()">로그아웃</button>
+  </div>
+</div>
+
+<div class="container">
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('auth')">🔐 인증</div>
+    <div class="tab" onclick="switchTab('aws')">🔗 연동</div>
+    <div class="tab" onclick="switchTab('sync')">🔄 동기화</div>
+    <div class="tab" onclick="switchTab('cost')">💰 비용 조회</div>
+    <div class="tab" onclick="switchTab('chat')">🤖 AI 질의</div>
+    <div class="tab" onclick="switchTab('dev')">📋 개발일지</div>
+  </div>
+
+  <!-- ① 인증 탭 -->
+  <div id="tab-auth" class="tab-content active">
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+      <div class="card">
+        <h2>로그인</h2>
+        <div class="form-group"><label>그룹명</label><input id="loginTenant" value="local-tenant"></div>
+        <div class="form-group"><label>이메일</label><input id="loginEmail" value="admin@finops.dev"></div>
+        <div class="form-group"><label>비밀번호</label><input id="loginPw" type="password" value="qwer1234"></div>
+        <button class="btn btn-primary" onclick="login()">로그인</button>
+        <div id="loginResult" class="response-box" style="display:none"></div>
+      </div>
+      <div class="card">
+        <h2>사용 가능한 계정</h2>
+        <div style="display:flex; flex-direction:column; gap:16px; margin-top:8px;">
+          <div style="background:#0f172a; border:1px solid #1e3a5f; border-radius:10px; padding:16px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+              <span style="background:#1e40af; color:#93c5fd; font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px;">ADMIN</span>
+              <span style="color:#e2e8f0; font-size:13px; font-weight:600;">관리자</span>
+            </div>
+            <div style="color:#94a3b8; font-size:12px; margin-bottom:4px;">이메일</div>
+            <code style="color:#fbbf24; font-size:13px;">admin@finops.dev</code>
+            <div style="color:#64748b; font-size:11px; margin-top:8px; line-height:1.6;">
+              전체 기능 접근 가능<br>
+              <span style="color:#f87171;">심야(01~04시) AI 질의 제한</span>
+            </div>
+          </div>
+          <div style="background:#0f172a; border:1px solid #1e3a5f; border-radius:10px; padding:16px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+              <span style="background:#374151; color:#9ca3af; font-size:11px; font-weight:700; padding:2px 8px; border-radius:999px;">VIEWER</span>
+              <span style="color:#e2e8f0; font-size:13px; font-weight:600;">실무자</span>
+            </div>
+            <div style="color:#94a3b8; font-size:12px; margin-bottom:4px;">이메일</div>
+            <code style="color:#fbbf24; font-size:13px;">user@finops.dev</code>
+            <div style="color:#64748b; font-size:11px; margin-top:8px; line-height:1.6;">
+              비용 조회 · 동기화 기능 접근 가능<br>
+              <span style="color:#f87171;">AI 질의 기능 비활성화</span>
+            </div>
+          </div>
+          <div style="color:#475569; font-size:11px; text-align:center;">공통 비밀번호: qwer1234</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ② 비용 조회 탭 -->
+  <div id="tab-cost" class="tab-content">
+    <div class="card">
+      <h2>비용 요약 조회</h2>
+      <div class="row">
+        <div class="form-group"><label>시작일</label><input id="costFrom" type="date"></div>
+        <div class="form-group"><label>종료일</label><input id="costTo" type="date"></div>
+        <button class="btn btn-primary" style="margin-bottom:14px" onclick="fetchCost()">조회</button>
+      </div>
+    </div>
+
+    <div id="costResult" style="display:none">
+      <div class="stats-grid">
+        <div class="stat-card"><div class="value" id="totalCost">-</div><div class="label">총 비용 (USD)</div></div>
+        <div class="stat-card"><div class="value" id="serviceCount">-</div><div class="label">서비스 수</div></div>
+      </div>
+      <div class="card">
+        <h2>서비스별 비용</h2>
+        <table><thead><tr><th>서비스</th><th>비용 (USD)</th></tr></thead>
+        <tbody id="serviceTable"></tbody></table>
+      </div>
+      <div class="card">
+        <h2>월별 비용</h2>
+        <table><thead><tr><th>월</th><th>비용 (USD)</th></tr></thead>
+        <tbody id="monthTable"></tbody></table>
+      </div>
+    </div>
+    <div id="costError" class="response-box error" style="display:none"></div>
+  </div>
+
+  <!-- ③ AWS 연동 Wizard 탭 -->
+  <div id="tab-aws" class="tab-content">
+    <!-- 운영 환경 안내 배너 -->
+    <div style="background:#052e16; border:1px solid #166534; border-radius:10px; padding:14px 18px; margin-bottom:16px; display:flex; align-items:center; gap:12px;">
+      <span style="font-size:20px;">✅</span>
+      <div>
+        <div style="color:#22c55e; font-weight:700; font-size:14px; margin-bottom:2px;">운영 환경 — AWS 연동 완료</div>
+        <div style="color:#86efac; font-size:12px; line-height:1.6;">
+          운영 환경에서는 관리자 계정(<code style="background:#0f172a; padding:1px 5px; border-radius:4px;">admin@finops.dev</code>)으로 AWS 계정이 이미 연동되어 있습니다.<br>
+          아래 연동 절차는 신규 AWS 계정을 추가 연동할 때 사용합니다.
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>AWS 계정 연동 <span id="awsStatusBadge" style="margin-left:8px"></span></h2>
+      <p style="color:#64748b; font-size:13px; margin-bottom:20px;">
+        CloudFormation으로 최소 권한 IAM Role을 생성하고 연동합니다. 고객 계정의 자격증명을 직접 입력하지 않습니다.
+      </p>
+
+      <!-- Step 진행 표시 -->
+      <div class="step-indicator">
+        <div>
+          <div class="step-dot active" id="sd1">1</div>
+          <div class="step-label">Setup</div>
+        </div>
+        <div class="step-line" id="sl1"></div>
+        <div>
+          <div class="step-dot" id="sd2">2</div>
+          <div class="step-label">CFN 배포</div>
+        </div>
+        <div class="step-line" id="sl2"></div>
+        <div>
+          <div class="step-dot" id="sd3">3</div>
+          <div class="step-label">연동 완료</div>
+        </div>
+      </div>
+
+      <!-- Step 1: Setup 시작 -->
+      <div class="wizard-step active" id="ws1">
+        <p style="color:#cbd5e1; font-size:14px; margin-bottom:16px;">
+          아직 AWS 연동이 설정되지 않았습니다.<br>
+          <strong style="color:#38bdf8">연동 설정 시작</strong>을 눌러 CloudFormation 템플릿을 생성하세요.
+        </p>
+        <button class="btn btn-primary" onclick="awsSetup()">연동 설정 시작</button>
+        <div id="awsSetupError" class="response-box error" style="display:none"></div>
+      </div>
+
+      <!-- Step 2: CFN 배포 -->
+      <div class="wizard-step" id="ws2">
+        <div style="margin-bottom:16px">
+          <div style="font-size:13px; color:#94a3b8; margin-bottom:6px">External ID (보안 식별자)</div>
+          <code id="externalIdDisplay" style="background:#0f172a; padding:6px 12px; border-radius:6px; color:#fbbf24; font-size:13px; border:1px solid #334155"></code>
+        </div>
+
+        <div style="margin-bottom:16px">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px">
+            <span style="font-size:13px; color:#94a3b8">CloudFormation 템플릿</span>
+            <div style="display:flex; gap:8px">
+              <button class="btn btn-sm" style="background:#334155; color:#e2e8f0" onclick="copyCfn()">📋 복사</button>
+              <button class="btn btn-sm" style="background:#334155; color:#e2e8f0" onclick="downloadCfn()">⬇ 다운로드</button>
+              <a id="cfnConsoleLink" href="#" target="_blank" class="btn btn-sm btn-primary">🚀 AWS 콘솔 열기</a>
+            </div>
+          </div>
+          <div class="cfn-box" id="cfnTemplate"></div>
+        </div>
+
+        <div style="background:#1a2744; border:1px solid #2563eb; border-radius:8px; padding:14px; margin-bottom:16px; font-size:13px; color:#93c5fd; line-height:1.8">
+          <strong>📌 배포 순서</strong><br>
+          1. 위 템플릿을 복사하거나 <strong>AWS 콘솔 열기</strong>를 클릭<br>
+          2. CloudFormation → 스택 생성 → 템플릿 붙여넣기<br>
+          3. 스택 이름: <code style="background:#0f172a; padding:1px 6px; border-radius:4px">finops-cost-reader</code><br>
+          4. 배포 완료 후 <strong>Outputs</strong> 탭의 <code style="background:#0f172a; padding:1px 6px; border-radius:4px">RoleArn</code> 값 복사
+        </div>
+
+        <div class="form-group">
+          <label>Role ARN (CloudFormation Outputs에서 복사)</label>
+          <input id="roleArnInput" placeholder="arn:aws:iam::123456789012:role/finops-cost-reader">
+        </div>
+        <div style="display:flex; gap:8px">
+          <button class="btn btn-primary" onclick="awsConnect()">연동 검증 및 완료</button>
+          <button class="btn" style="background:#334155; color:#e2e8f0" onclick="awsGoStep(1)">← 뒤로</button>
+        </div>
+        <div id="awsConnectResult" class="response-box" style="display:none; margin-top:12px"></div>
+      </div>
+
+      <!-- Step 3: 완료 -->
+      <div class="wizard-step" id="ws3">
+        <div style="text-align:center; padding:32px 0">
+          <div style="font-size:48px; margin-bottom:12px">✅</div>
+          <div style="font-size:18px; font-weight:700; color:#22c55e; margin-bottom:8px">AWS 연동 완료</div>
+          <div style="font-size:13px; color:#64748b; margin-bottom:4px">연동된 Role ARN</div>
+          <code id="connectedRoleArn" style="color:#93c5fd; font-size:12px"></code>
+          <br><br>
+          <div style="font-size:13px; color:#64748b; margin-bottom:4px">검증된 AssumedRole ARN</div>
+          <code id="assumedRoleArn" style="color:#86efac; font-size:12px"></code>
+          <br><br>
+          <button class="btn btn-primary" onclick="switchTab('sync')">→ AWS 동기화 탭으로 이동</button>
+        </div>
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <!-- ④ AWS 동기화 탭 -->
+  <div id="tab-sync" class="tab-content">
+    <div class="card">
+      <h2>AWS Cost Explorer 동기화</h2>
+      <p style="color:#64748b; font-size:13px; margin-bottom:16px;">ADMIN / EDITOR 권한 필요. AWS 자격증명이 설정된 경우에만 동작합니다.</p>
+      <div class="row">
+        <div class="form-group"><label>시작일</label><input id="syncFrom" type="date"></div>
+        <div class="form-group"><label>종료일</label><input id="syncTo" type="date"></div>
+        <button class="btn btn-primary" style="margin-bottom:14px" onclick="syncCost()">동기화 실행</button>
+      </div>
+      <div id="syncResult" class="response-box" style="display:none"></div>
+    </div>
+
+    <div class="card">
+      <h2>컴퓨팅 메트릭 수집</h2>
+      <p style="color:#64748b; font-size:13px; margin-bottom:16px;">
+        EC2 CPU(7일 평균/24시간 최대) · ECS CPU+메모리를 CloudWatch에서 수집해 DB에 저장합니다.<br>
+        AWS 연동(CONNECTED) 상태에서만 동작합니다.
+      </p>
+      <div style="display:flex; gap:8px; margin-bottom:4px; flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="collectMetrics()">📡 메트릭 수집</button>
+        <button class="btn" style="background:#334155; color:#e2e8f0" onclick="fetchMetrics()">📋 수집된 메트릭 조회</button>
+        <button class="btn" style="background:#0e4429; color:#86efac; border:1px solid #166534" onclick="fetchEnriched()">🔍 비용+메트릭 통합 인사이트</button>
+      </div>
+      <div id="metricsResult" class="response-box" style="display:none"></div>
+    </div>
+
+    <div id="metricsTableWrap" style="display:none">
+      <div class="card">
+        <h2>컴퓨팅 메트릭 스냅샷</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>타입</th><th>리소스 ID</th><th>이름</th>
+              <th>CPU avg</th><th>CPU max</th><th>MEM avg</th><th>MEM max</th>
+              <th>낭비등급</th>
+            </tr>
+          </thead>
+          <tbody id="metricsTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="enrichedTableWrap" style="display:none">
+      <div class="card">
+        <h2>비용 + 컴퓨팅 통합 인사이트 (최근 30일)</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>서비스</th><th>비용(USD)</th>
+              <th>CPU avg</th><th>CPU max</th><th>MEM avg</th>
+              <th>낭비등급</th><th>권장사항</th>
+            </tr>
+          </thead>
+          <tbody id="enrichedTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑤ AI 질의 탭 -->
+  <div id="tab-chat" class="tab-content">
+    <div class="card">
+      <h2>Claude AI 비용 분석</h2>
+      <p style="color:#64748b; font-size:13px; margin-bottom:12px;">
+        자유 질문 또는 <strong style="color:#86efac">AI 절감 분석</strong>으로 최신 컴퓨팅 데이터를 자동 분석합니다.
+      </p>
+      <div style="margin-bottom:12px">
+        <button class="btn" style="background:#0e4429; color:#86efac; border:1px solid #166534" onclick="aiAnalyzeMetrics()">
+          🤖 AI 절감 분석 (데이터 자동 포함)
+        </button>
+      </div>
+      <div class="chat-messages" id="chatMessages">
+        <div class="msg bot">안녕하세요! AWS 비용 분석을 도와드리겠습니다.<br>예: "지난달 가장 비용이 많이 든 서비스는?" 또는 자유 질문 입력</div>
+      </div>
+      <div class="chat-input-row">
+        <input id="chatInput" placeholder="질문을 입력하세요..." onkeydown="if(event.key==='Enter') sendChat()">
+        <button class="btn btn-primary" onclick="sendChat()">전송</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ⑥ 개발일지 탭 -->
+  <div id="tab-dev" class="tab-content">
+    <div class="card">
+      <h2>📋 프로젝트 개발일지</h2>
+      <p style="color:#64748b; font-size:13px;">FinOps Dashboard · 면접 준비 사이드 프로젝트 · Spring Boot 3.x</p>
+    </div>
+
+    <!-- 기술 스택 -->
+    <div class="card">
+      <h2>기술 스택</h2>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:4px">
+        <span style="background:#1d4ed8; color:#bfdbfe; padding:4px 14px; border-radius:999px; font-size:13px; font-weight:600">Java 17</span>
+        <span style="background:#15803d; color:#bbf7d0; padding:4px 14px; border-radius:999px; font-size:13px; font-weight:600">Spring Boot 3.3</span>
+        <span style="background:#7c3aed; color:#ddd6fe; padding:4px 14px; border-radius:999px; font-size:13px; font-weight:600">Spring Security</span>
+        <span style="background:#9a3412; color:#fed7aa; padding:4px 14px; border-radius:999px; font-size:13px; font-weight:600">JWT</span>
+        <span style="background:#0e4429; color:#86efac; padding:4px 14px; border-radius:999px; font-size:13px; font-weight:600">H2 In-memory</span>
+        <span style="background:#164e63; color:#a5f3fc; padding:4px 14px; border-radius:999px; font-size:13px; font-weight:600">AWS SDK v2</span>
+        <span style="background:#4a1d96; color:#e9d5ff; padding:4px 14px; border-radius:999px; font-size:13px; font-weight:600">Claude API</span>
+        <span style="background:#1e293b; color:#94a3b8; padding:4px 14px; border-radius:999px; font-size:13px; font-weight:600; border:1px solid #334155">WebFlux</span>
+        <span style="background:#1e293b; color:#94a3b8; padding:4px 14px; border-radius:999px; font-size:13px; font-weight:600; border:1px solid #334155">Spring AOP</span>
+      </div>
+    </div>
+
+    <!-- 아키텍처 흐름 -->
+    <div class="card">
+      <h2>시스템 흐름</h2>
+      <div style="display:flex; align-items:center; justify-content:center; gap:0; flex-wrap:wrap; margin:8px 0; font-size:13px;">
+        <div style="background:#0f172a; border:1px solid #38bdf8; border-radius:8px; padding:10px 16px; text-align:center; color:#38bdf8; font-weight:600">
+          🖥️ UI<br><span style="font-size:11px; color:#64748b">index.html</span>
+        </div>
+        <div style="color:#334155; font-size:20px; padding:0 6px">→</div>
+        <div style="background:#0f172a; border:1px solid #7c3aed; border-radius:8px; padding:10px 16px; text-align:center; color:#c4b5fd; font-weight:600">
+          🔐 JWT Filter<br><span style="font-size:11px; color:#64748b">TenantContext</span>
+        </div>
+        <div style="color:#334155; font-size:20px; padding:0 6px">→</div>
+        <div style="background:#0f172a; border:1px solid #0369a1; border-radius:8px; padding:10px 16px; text-align:center; color:#7dd3fc; font-weight:600">
+          ⚙️ Service Layer<br><span style="font-size:11px; color:#64748b">+ AOP Audit</span>
+        </div>
+        <div style="color:#334155; font-size:20px; padding:0 6px">→</div>
+        <div style="background:#0f172a; border:1px solid #166534; border-radius:8px; padding:10px 16px; text-align:center; color:#86efac; font-weight:600">
+          🗄️ H2 DB<br><span style="font-size:11px; color:#64748b">JPA / FOCUS</span>
+        </div>
+        <div style="color:#334155; font-size:20px; padding:0 6px">→</div>
+        <div style="background:#0f172a; border:1px solid #9a3412; border-radius:8px; padding:10px 16px; text-align:center; color:#fdba74; font-weight:600">
+          ☁️ AWS SDK<br><span style="font-size:11px; color:#64748b">AssumeRole</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 핵심 구현 포인트 -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:16px;">
+
+      <div class="card" style="border-color:#7c3aed">
+        <div style="font-size:22px; margin-bottom:8px">🔐</div>
+        <div style="font-size:14px; font-weight:700; color:#c4b5fd; margin-bottom:8px">멀티테넌트 JWT 인증</div>
+        <div style="font-size:13px; color:#94a3b8; line-height:1.7">
+          JWT Claim에 <code style="background:#0f172a; padding:1px 5px; border-radius:4px; color:#fbbf24">tenantId</code> 포함.<br>
+          <code style="background:#0f172a; padding:1px 5px; border-radius:4px; color:#fbbf24">JwtAuthFilter</code> → <code style="background:#0f172a; padding:1px 5px; border-radius:4px; color:#fbbf24">TenantContext</code>(ThreadLocal)<br>
+          모든 쿼리에 tenantId 자동 바인딩.<br>
+          RBAC: ADMIN / EDITOR / VIEWER 역할 분리.
+        </div>
+      </div>
+
+      <div class="card" style="border-color:#0369a1">
+        <div style="font-size:22px; margin-bottom:8px">☁️</div>
+        <div style="font-size:14px; font-weight:700; color:#7dd3fc; margin-bottom:8px">CFN + AssumeRole 연동</div>
+        <div style="font-size:13px; color:#94a3b8; line-height:1.7">
+          고객 자격증명 직접 보관 ❌<br>
+          CloudFormation으로 최소권한 Role 생성.<br>
+          ExternalId 조건으로 Confused Deputy 방지.<br>
+          Datadog / OptiNow 동일 패턴 사용.
+        </div>
+      </div>
+
+      <div class="card" style="border-color:#15803d">
+        <div style="font-size:22px; margin-bottom:8px">📊</div>
+        <div style="font-size:14px; font-weight:700; color:#86efac; margin-bottom:8px">FOCUS 표준 비용 정규화</div>
+        <div style="font-size:13px; color:#94a3b8; line-height:1.7">
+          FinOps Foundation FOCUS 스펙 기반.<br>
+          BillingPeriodStart · ServiceName · BilledCost<br>
+          멀티 클라우드 확장 가능한 공통 스키마.<br>
+          월별/서비스별 집계 Native Query.
+        </div>
+      </div>
+
+      <div class="card" style="border-color:#9a3412">
+        <div style="font-size:22px; margin-bottom:8px">📡</div>
+        <div style="font-size:14px; font-weight:700; color:#fdba74; margin-bottom:8px">CloudWatch 메트릭 수집</div>
+        <div style="font-size:13px; color:#94a3b8; line-height:1.7">
+          EC2: CPU 7일 평균 / 24h 최대.<br>
+          ECS: CPU + 메모리 사용률 수집.<br>
+          WasteScore (HIGH/MEDIUM/LOW) 자동 계산.<br>
+          EC2 &lt; 10% avg → HIGH(낭비) 판정.
+        </div>
+      </div>
+
+      <div class="card" style="border-color:#1d4ed8">
+        <div style="font-size:22px; margin-bottom:8px">🔍</div>
+        <div style="font-size:14px; font-weight:700; color:#93c5fd; margin-bottom:8px">비용 + 메트릭 통합 인사이트</div>
+        <div style="font-size:13px; color:#94a3b8; line-height:1.7">
+          <code style="background:#0f172a; padding:1px 5px; border-radius:4px; color:#fbbf24">/costs/enriched</code> 엔드포인트.<br>
+          30일 비용 + 최신 컴퓨팅 메트릭 JOIN.<br>
+          서비스명 매핑(AmazonEC2 → EC2).<br>
+          자동 절감 권고문 생성.
+        </div>
+      </div>
+
+      <div class="card" style="border-color:#4a1d96">
+        <div style="font-size:22px; margin-bottom:8px">🤖</div>
+        <div style="font-size:14px; font-weight:700; color:#e9d5ff; margin-bottom:8px">Claude AI 구조화 분석</div>
+        <div style="font-size:13px; color:#94a3b8; line-height:1.7">
+          단순 질문 전송이 아닌<br>
+          <strong style="color:#c4b5fd">Context + Data + Task</strong> 프롬프트 패턴.<br>
+          enriched 데이터 자동 포함 → 데이터 기반 추천.<br>
+          WebFlux 비동기 스트리밍 호출.
+        </div>
+      </div>
+
+      <div class="card" style="border-color:#334155">
+        <div style="font-size:22px; margin-bottom:8px">📝</div>
+        <div style="font-size:14px; font-weight:700; color:#94a3b8; margin-bottom:8px">AOP 감사 로그</div>
+        <div style="font-size:13px; color:#94a3b8; line-height:1.7">
+          <code style="background:#0f172a; padding:1px 5px; border-radius:4px; color:#fbbf24">@Auditable(action, resource)</code> 어노테이션.<br>
+          AspectJ Around으로 자동 기록.<br>
+          비즈니스 코드에 로깅 코드 ❌.<br>
+          감사 로그 테이블 자동 적재.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let accessToken = localStorage.getItem('finops_token') || '';
+  updateTokenStatus();
+
+  // 날짜 기본값 세팅
+  const today = new Date();
+  const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+  ['costFrom','syncFrom'].forEach(id => document.getElementById(id).value = fmt(firstDay));
+  ['costTo','syncTo'].forEach(id => document.getElementById(id).value = fmt(today));
+
+  function fmt(d) { return d.toISOString().split('T')[0]; }
+
+  const TAB_NAMES = ['auth','aws','sync','cost','chat','dev'];
+
+  function switchTab(name) {
+    document.querySelectorAll('.tab, .tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab')[TAB_NAMES.indexOf(name)].classList.add('active');
+    document.getElementById('tab-' + name).classList.add('active');
+    if (name === 'aws') awsCheckStatus();
+  }
+
+  function updateTokenStatus() {
+    const el = document.getElementById('tokenStatus');
+    const btn = document.getElementById('logoutBtn');
+    if (accessToken) {
+      try {
+        const payload = JSON.parse(atob(accessToken.split('.')[1]));
+        el.innerHTML = `<span class="token-badge">✓ ${payload.sub} (${payload.role})</span>`;
+        btn.style.display = 'inline-block';
+        applyRoleBasedUI(payload.role);
+      } catch { el.textContent = '토큰 파싱 오류'; }
+    } else {
+      el.textContent = '로그인 필요';
+      btn.style.display = 'none';
+      applyRoleBasedUI(null);
+    }
+  }
+
+  function applyRoleBasedUI(role) {
+    const chatTab = document.querySelectorAll('.tab')[TAB_NAMES.indexOf('chat')];
+    if (role === 'VIEWER') {
+      // AI 탭 비활성화
+      chatTab.onclick = () => alert('AI 질의 기능은 관리자/편집자만 사용할 수 있습니다.');
+      chatTab.style.opacity = '0.4';
+      chatTab.style.cursor = 'not-allowed';
+      chatTab.title = '권한 없음 (VIEWER)';
+    } else {
+      // 정상 복구
+      chatTab.onclick = () => switchTab('chat');
+      chatTab.style.opacity = '';
+      chatTab.style.cursor = '';
+      chatTab.title = '';
+    }
+  }
+
+  function logout() {
+    accessToken = '';
+    localStorage.removeItem('finops_token');
+    updateTokenStatus();
+  }
+
+  async function api(method, path, body) {
+    const opts = { method, headers: { 'Content-Type': 'application/json' } };
+    if (accessToken) opts.headers['Authorization'] = 'Bearer ' + accessToken;
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch('/api/v1' + path, opts);
+    return { status: res.status, data: await res.json() };
+  }
+
+  function showBox(id, text, isError) {
+    const el = document.getElementById(id);
+    el.style.display = 'block';
+    el.className = 'response-box' + (isError ? ' error' : '');
+    el.textContent = typeof text === 'string' ? text : JSON.stringify(text, null, 2);
+  }
+
+  async function login() {
+    const r = await api('POST', '/auth/login', {
+      tenantCode: document.getElementById('loginTenant').value,
+      email: document.getElementById('loginEmail').value,
+      password: document.getElementById('loginPw').value
+    });
+    if (r.status === 200 && r.data.data?.accessToken) {
+      accessToken = r.data.data.accessToken;
+      localStorage.setItem('finops_token', accessToken);
+      updateTokenStatus();
+      showBox('loginResult', '✓ 로그인 성공\n\n' + JSON.stringify(r.data, null, 2), false);
+    } else {
+      showBox('loginResult', r.data, true);
+    }
+  }
+
+  async function signup() {
+    const r = await api('POST', '/auth/signup', {
+      tenantCode: document.getElementById('signupTenant').value,
+      email: document.getElementById('signupEmail').value,
+      password: document.getElementById('signupPw').value
+    });
+    showBox('signupResult', r.data, r.status !== 201);
+  }
+
+  async function fetchCost() {
+    document.getElementById('costResult').style.display = 'none';
+    document.getElementById('costError').style.display = 'none';
+    const from = document.getElementById('costFrom').value;
+    const to = document.getElementById('costTo').value;
+    const r = await api('GET', `/costs/summary?from=${from}&to=${to}`);
+    if (r.status === 200) {
+      const d = r.data.data;
+      document.getElementById('totalCost').textContent = '$' + (d.totalCost || 0).toFixed(2);
+      document.getElementById('serviceCount').textContent = d.byService?.length || 0;
+      document.getElementById('serviceTable').innerHTML = (d.byService || [])
+        .map(s => `<tr><td>${s.serviceName}</td><td>$${parseFloat(s.cost).toFixed(4)}</td></tr>`).join('');
+      document.getElementById('monthTable').innerHTML = (d.byMonth || [])
+        .map(m => `<tr><td>${m.yearMonth}</td><td>$${parseFloat(m.cost).toFixed(2)}</td></tr>`).join('');
+      document.getElementById('costResult').style.display = 'block';
+    } else {
+      showBox('costError', r.data, true);
+    }
+  }
+
+  async function syncCost() {
+    const from = document.getElementById('syncFrom').value;
+    const to = document.getElementById('syncTo').value;
+    const el = document.getElementById('syncResult');
+    el.style.display = 'block';
+    el.className = 'response-box';
+    el.innerHTML = '<span class="spinner"></span>동기화 중...';
+    const r = await api('POST', `/costs/sync?from=${from}&to=${to}`);
+    showBox('syncResult', r.data, r.status !== 200);
+  }
+
+  async function sendChat() {
+    const input = document.getElementById('chatInput');
+    const q = input.value.trim();
+    if (!q) return;
+    input.value = '';
+
+    const box = document.getElementById('chatMessages');
+    box.innerHTML += `<div class="msg user">${escHtml(q)}</div>`;
+    box.innerHTML += `<div class="msg bot" id="typing"><span class="spinner"></span>분석 중...</div>`;
+    box.scrollTop = box.scrollHeight;
+
+    const r = await api('POST', '/chat', { question: q });
+    document.getElementById('typing').remove();
+    const answer = r.status === 200 ? (r.data.data || r.data.message) : JSON.stringify(r.data);
+    box.innerHTML += `<div class="msg bot">${escHtml(answer)}</div>`;
+    box.scrollTop = box.scrollHeight;
+  }
+
+  // ── AWS 연동 Wizard ──────────────────────────────
+  let cfnTemplateText = '';
+
+  async function awsCheckStatus() {
+    if (!accessToken) return;
+    try {
+      const r = await api('GET', '/aws/integration/status');
+      if (r.status === 200) {
+        const d = r.data.data;
+        setAwsBadge(d.status);
+        if (d.status === 'CONNECTED') { awsGoStep(3); return; }
+        if (d.status === 'PENDING' || d.status === 'FAILED') {
+          cfnTemplateText = d.cfnTemplateYaml;
+          document.getElementById('externalIdDisplay').textContent = d.externalId;
+          document.getElementById('cfnTemplate').textContent = d.cfnTemplateYaml;
+          document.getElementById('cfnConsoleLink').href = d.cfnConsoleUrl;
+          awsGoStep(2);
+        }
+      }
+    } catch(e) { /* 연동 없음 → step1 유지 */ }
+  }
+
+  async function awsSetup() {
+    document.getElementById('awsSetupError').style.display = 'none';
+    const r = await api('GET', '/aws/integration/setup');
+    if (r.status === 200) {
+      const d = r.data.data;
+      cfnTemplateText = d.cfnTemplateYaml;
+      document.getElementById('externalIdDisplay').textContent = d.externalId;
+      document.getElementById('cfnTemplate').textContent = d.cfnTemplateYaml;
+      document.getElementById('cfnConsoleLink').href = d.cfnConsoleUrl;
+      setAwsBadge(d.status);
+      awsGoStep(2);
+    } else {
+      const el = document.getElementById('awsSetupError');
+      el.style.display = 'block';
+      el.textContent = JSON.stringify(r.data, null, 2);
+    }
+  }
+
+  async function awsConnect() {
+    const roleArn = document.getElementById('roleArnInput').value.trim();
+    if (!roleArn) { alert('Role ARN을 입력하세요.'); return; }
+    const resultEl = document.getElementById('awsConnectResult');
+    resultEl.style.display = 'block';
+    resultEl.className = 'response-box';
+    resultEl.innerHTML = '<span class="spinner"></span>AssumeRole 검증 중...';
+
+    const r = await api('POST', '/aws/integration/connect', { roleArn });
+    if (r.status === 200) {
+      const d = r.data.data;
+      document.getElementById('connectedRoleArn').textContent = d.roleArn;
+      document.getElementById('assumedRoleArn').textContent = d.assumedArn;
+      setAwsBadge('CONNECTED');
+      awsGoStep(3);
+    } else {
+      resultEl.className = 'response-box error';
+      resultEl.textContent = JSON.stringify(r.data, null, 2);
+    }
+  }
+
+  function awsGoStep(n) {
+    [1,2,3].forEach(i => {
+      document.getElementById('ws'+i).classList.toggle('active', i === n);
+      const dot = document.getElementById('sd'+i);
+      dot.classList.toggle('active', i === n);
+      dot.classList.toggle('done', i < n);
+    });
+    [1,2].forEach(i => {
+      const line = document.getElementById('sl'+i);
+      if (line) line.classList.toggle('done', i < n);
+    });
+  }
+
+  function setAwsBadge(status) {
+    const el = document.getElementById('awsStatusBadge');
+    const labels = { CONNECTED:'연결됨', PENDING:'대기 중', FAILED:'실패' };
+    el.className = 'status-badge ' + status;
+    el.textContent = labels[status] || status;
+  }
+
+  function copyCfn() {
+    navigator.clipboard.writeText(cfnTemplateText).then(() => alert('복사 완료!'));
+  }
+
+  function downloadCfn() {
+    const blob = new Blob([cfnTemplateText], { type: 'text/yaml' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'finops-cost-reader.yaml';
+    a.click();
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+  }
+
+  // ── 컴퓨팅 메트릭 수집 / 조회 ────────────────────────
+  const WASTE_COLOR = { HIGH: '#fca5a5', MEDIUM: '#fde68a', LOW: '#86efac', UNKNOWN: '#94a3b8' };
+
+  async function collectMetrics() {
+    const el = document.getElementById('metricsResult');
+    el.style.display = 'block';
+    el.className = 'response-box';
+    el.innerHTML = '<span class="spinner"></span>CloudWatch 메트릭 수집 중...';
+    document.getElementById('metricsTableWrap').style.display = 'none';
+    document.getElementById('enrichedTableWrap').style.display = 'none';
+
+    const r = await api('POST', '/metrics/compute/collect');
+    if (r.status === 200) {
+      const d = r.data.data;
+      const list = [...(d.ec2 || []), ...(d.ecs || [])];
+      el.className = 'response-box';
+      el.textContent = `✓ 수집 완료 — EC2: ${(d.ec2||[]).length}개, ECS: ${(d.ecs||[]).length}개`;
+      renderMetricsTable(list);
+    } else {
+      el.className = 'response-box error';
+      el.textContent = JSON.stringify(r.data, null, 2);
+    }
+  }
+
+  async function fetchMetrics() {
+    const el = document.getElementById('metricsResult');
+    el.style.display = 'block';
+    el.className = 'response-box';
+    el.innerHTML = '<span class="spinner"></span>메트릭 조회 중...';
+    document.getElementById('enrichedTableWrap').style.display = 'none';
+
+    const r = await api('GET', '/metrics/compute');
+    if (r.status === 200) {
+      const d = r.data.data;
+      const list = [...(d.ec2 || []), ...(d.ecs || [])];
+      el.className = 'response-box';
+      el.textContent = `총 ${list.length}개 메트릭 조회됨`;
+      renderMetricsTable(list);
+    } else {
+      el.className = 'response-box error';
+      el.textContent = JSON.stringify(r.data, null, 2);
+    }
+  }
+
+  function renderMetricsTable(list) {
+    const wrap = document.getElementById('metricsTableWrap');
+    if (!list.length) { wrap.style.display = 'none'; return; }
+    document.getElementById('metricsTable').innerHTML = list.map(m => `
+      <tr>
+        <td>${m.resourceType || '-'}</td>
+        <td style="font-size:12px; color:#93c5fd">${m.resourceId || '-'}</td>
+        <td>${m.resourceName || '-'}</td>
+        <td>${m.avgCpuPercent != null ? m.avgCpuPercent + '%' : '-'}</td>
+        <td>${m.maxCpuPercent != null ? m.maxCpuPercent + '%' : '-'}</td>
+        <td>${m.avgMemoryPercent != null ? m.avgMemoryPercent + '%' : '-'}</td>
+        <td>${m.maxMemoryPercent != null ? m.maxMemoryPercent + '%' : '-'}</td>
+        <td><span style="color:${WASTE_COLOR[m.wasteScore]||'#94a3b8'}; font-weight:600">${m.wasteScore || 'UNKNOWN'}</span></td>
+      </tr>`).join('');
+    wrap.style.display = 'block';
+  }
+
+  async function fetchEnriched() {
+    const el = document.getElementById('metricsResult');
+    el.style.display = 'block';
+    el.className = 'response-box';
+    el.innerHTML = '<span class="spinner"></span>통합 인사이트 조회 중...';
+    document.getElementById('metricsTableWrap').style.display = 'none';
+
+    const r = await api('GET', '/costs/enriched');
+    if (r.status === 200) {
+      const list = r.data.data || [];
+      el.className = 'response-box';
+      el.textContent = `총 ${list.length}개 서비스 인사이트`;
+      renderEnrichedTable(list);
+    } else {
+      el.className = 'response-box error';
+      el.textContent = JSON.stringify(r.data, null, 2);
+    }
+  }
+
+  // ── AI 절감 분석: enriched 데이터 자동 포함 구조화 프롬프트 ────
+  async function aiAnalyzeMetrics() {
+    const box = document.getElementById('chatMessages');
+    box.innerHTML += `<div class="msg user">🤖 AI 절감 분석 요청 (데이터 자동 포함)</div>`;
+    box.innerHTML += `<div class="msg bot" id="typing"><span class="spinner"></span>데이터 수집 중...</div>`;
+    box.scrollTop = box.scrollHeight;
+    switchTab('chat');
+
+    // 1. enriched 데이터 fetch
+    const r = await api('GET', '/costs/enriched');
+    if (r.status !== 200) {
+      document.getElementById('typing').remove();
+      box.innerHTML += `<div class="msg bot" style="color:#fca5a5">enriched 데이터 조회 실패. 먼저 메트릭을 수집해주세요.</div>`;
+      box.scrollTop = box.scrollHeight;
+      return;
+    }
+    const list = r.data.data || [];
+
+    // 2. 구조화 프롬프트 생성 (Context + Data + Task)
+    const dataText = list.map(s =>
+      `- ${s.serviceName}: 비용 $${parseFloat(s.totalCost).toFixed(2)}, CPU평균 ${s.avgCpuPercent ?? 'N/A'}%, CPU최대 ${s.maxCpuPercent ?? 'N/A'}%, 메모리평균 ${s.avgMemoryPercent ?? 'N/A'}%, 낭비등급 ${s.wasteScore ?? 'UNKNOWN'}, 현재권고: ${s.recommendation ?? '없음'}`
+    ).join('\n');
+
+    const question = `당신은 AWS FinOps 비용 최적화 전문가입니다.\n아래는 최근 30일 실제 AWS 비용 및 컴퓨팅 메트릭 데이터입니다:\n\n${dataText}\n\n위 데이터를 기반으로:\n1. 낭비등급 HIGH/MEDIUM 서비스의 구체적인 절감 방법\n2. 예상 절감 가능 비용 (개략적으로)\n3. 우선순위 액션 3가지\n를 간결하게 한국어로 답변해주세요.`;
+
+    document.getElementById('typing').innerHTML = '<span class="spinner"></span>Claude 분석 중...';
+
+    const cr = await api('POST', '/chat', { question });
+    document.getElementById('typing').remove();
+    const answer = cr.status === 200 ? (cr.data.data || cr.data.message) : JSON.stringify(cr.data);
+    box.innerHTML += `<div class="msg bot">${escHtml(answer)}</div>`;
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function renderEnrichedTable(list) {
+    const wrap = document.getElementById('enrichedTableWrap');
+    if (!list.length) { wrap.style.display = 'none'; return; }
+    document.getElementById('enrichedTable').innerHTML = list.map(s => `
+      <tr>
+        <td style="font-weight:600">${s.serviceName}</td>
+        <td>$${parseFloat(s.totalCost).toFixed(2)}</td>
+        <td>${s.avgCpuPercent != null ? s.avgCpuPercent + '%' : '-'}</td>
+        <td>${s.maxCpuPercent != null ? s.maxCpuPercent + '%' : '-'}</td>
+        <td>${s.avgMemoryPercent != null ? s.avgMemoryPercent + '%' : '-'}</td>
+        <td><span style="color:${WASTE_COLOR[s.wasteScore]||'#94a3b8'}; font-weight:600">${s.wasteScore || 'UNKNOWN'}</span></td>
+        <td style="font-size:12px; color:#cbd5e1">${s.recommendation || '-'}</td>
+      </tr>`).join('');
+    wrap.style.display = 'block';
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,112 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: FinOps Dashboard - EC2 (t3.micro) + Security Group + EIP
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: finops
+
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: EC2 접속용 키페어 이름
+
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    AllowedValues: [ t3.micro, t3.small ]
+
+Resources:
+
+  # ── 보안 그룹 ──────────────────────────────────────────
+  SgFinOps:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub ${ProjectName}-sg
+      GroupDescription: FinOps app (8080) + SSH (22)
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 8080
+          ToPort: 8080
+          CidrIp: 0.0.0.0/0
+          Description: FinOps 앱 HTTP
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+          Description: SSH (배포 후 IP 제한 권장)
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-sg
+
+  # ── EC2 인스턴스 ────────────────────────────────────────
+  FinOpsEC2:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyPairName
+      ImageId: !Sub '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64}}'
+      SecurityGroupIds:
+        - !Ref SgFinOps
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-server
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -e
+
+          # Java 17 설치
+          dnf install -y java-17-amazon-corretto
+
+          # 앱 디렉토리 생성
+          mkdir -p /opt/finops
+          chown ec2-user:ec2-user /opt/finops
+
+          # 환경변수 파일 플레이스홀더 (GitHub Actions가 실제 값으로 교체)
+          touch /opt/finops/.env
+          chmod 600 /opt/finops/.env
+          chown ec2-user:ec2-user /opt/finops/.env
+
+          # systemd 서비스 등록
+          cat > /etc/systemd/system/finops.service << 'EOF'
+          [Unit]
+          Description=FinOps Dashboard
+          After=network.target
+
+          [Service]
+          User=ec2-user
+          WorkingDirectory=/opt/finops
+          EnvironmentFile=/opt/finops/.env
+          ExecStart=/usr/bin/java -jar /opt/finops/finops.jar \
+            --spring.profiles.active=prod
+          Restart=always
+          RestartSec=10
+          StandardOutput=journal
+          StandardError=journal
+
+          [Install]
+          WantedBy=multi-user.target
+          EOF
+
+          systemctl daemon-reload
+          systemctl enable finops
+
+  # ── 고정 IP ─────────────────────────────────────────────
+  FinOpsEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      InstanceId: !Ref FinOpsEC2
+      Tags:
+        - Key: Name
+          Value: !Sub ${ProjectName}-eip
+
+Outputs:
+  PublicIp:
+    Value: !Ref FinOpsEIP
+    Description: EC2 고정 퍼블릭 IP → GitHub Secret EC2_HOST에 등록
+    Export:
+      Name: !Sub ${ProjectName}-PublicIp
+
+  AppUrl:
+    Value: !Sub "http://${FinOpsEIP}:8080"
+    Description: FinOps 대시보드 접속 URL

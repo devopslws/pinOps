@@ -1,0 +1,45 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:finops;DB_CLOSE_DELAY=-1;MODE=MySQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  h2:
+    console:
+      enabled: false   # 운영 환경 비활성화
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+    defer-datasource-initialization: true
+    open-in-view: false
+
+  sql:
+    init:
+      mode: always
+
+  flyway:
+    enabled: false
+
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-exp-ms: 3600000
+  refresh-token-exp-ms: 604800000
+
+aws:
+  access-key: ${AWS_ACCESS_KEY_ID}
+  secret-key: ${AWS_SECRET_ACCESS_KEY}
+  region: us-east-1
+  resources-region: ap-northeast-2
+
+groq:
+  api-key: ${GROQ_API_KEY}
+  model: llama-3.3-70b-versatile
+
+logging:
+  level:
+    com.finops: INFO

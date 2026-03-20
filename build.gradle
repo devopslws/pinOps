@@ -1,0 +1,63 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.3.5'
+    id 'io.spring.dependency-management' version '1.1.6'
+}
+
+group = 'com.finops'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Spring Boot
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
+
+    // Database (H2 in-memory)
+    runtimeOnly 'com.h2database:h2'
+
+    // JWT (jjwt)
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+
+    // AWS SDK v2
+    implementation platform('software.amazon.awssdk:bom:2.28.17')
+    implementation 'software.amazon.awssdk:costexplorer'
+    implementation 'software.amazon.awssdk:sts'
+    implementation 'software.amazon.awssdk:cloudwatch'   // CPU 사용률 메트릭
+    implementation 'software.amazon.awssdk:ec2'          // EC2 인스턴스 목록
+    implementation 'software.amazon.awssdk:ecs'          // ECS 클러스터/서비스 목록
+
+    // HTTP Client (Claude API 호출용)
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
+    // Lombok
+    compileOnly 'org.projectlombok:lombok:1.18.34'
+    annotationProcessor 'org.projectlombok:lombok:1.18.34'
+
+    // Test
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}

@@ -1,0 +1,36 @@
+spring:
+  profiles:
+    active: local
+
+  datasource:
+    url: jdbc:h2:mem:finops;DB_CLOSE_DELAY=-1;MODE=MySQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  h2:
+    console:
+      enabled: true        # http://localhost:8080/h2-console
+      path: /h2-console
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop  # 기동 시 생성, 종료 시 삭제
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: true
+    defer-datasource-initialization: true  # data.sql을 JPA 스키마 생성 후 실행
+    open-in-view: false
+
+  sql:
+    init:
+      mode: always           # data.sql 항상 실행
+
+  flyway:
+    enabled: false
+
+logging:
+  level:
+    com.finops: DEBUG
+    org.hibernate.SQL: DEBUG

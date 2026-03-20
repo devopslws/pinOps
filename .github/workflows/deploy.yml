@@ -1,0 +1,70 @@
+name: Build & Deploy to EC2
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 소스 체크아웃
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # 2. Java 17 설정
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # 3. Gradle 캐시
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('**/*.gradle*') }}
+
+      # 4. JAR 빌드 (테스트 제외)
+      - name: Build JAR
+        run: ./gradlew bootJar -x test
+
+      # 5. EC2에 JAR 전송
+      - name: SCP JAR to EC2
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          source: "build/libs/*-SNAPSHOT.jar"
+          target: "/opt/finops/"
+          strip_components: 2   # build/libs/ 경로 제거
+
+      # 6. EC2 환경변수 파일 갱신 + 서비스 재시작
+      - name: Deploy & Restart
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # 환경변수 파일 갱신
+            cat > /opt/finops/.env << 'EOF'
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+            GROQ_API_KEY=${{ secrets.GROQ_API_KEY }}
+            EOF
+            chmod 600 /opt/finops/.env
+
+            # JAR 이름 표준화
+            mv /opt/finops/*-SNAPSHOT.jar /opt/finops/finops.jar 2>/dev/null || true
+
+            # 서비스 재시작
+            sudo systemctl restart finops
+            sleep 5
+            sudo systemctl status finops --no-pager
