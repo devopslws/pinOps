@@ -31,7 +31,9 @@ jobs:
 
       # 4. JAR 빌드 (테스트 제외)
       - name: Build JAR
-        run: ./gradlew bootJar -x test
+        run: |
+          chmod +x gradlew
+          ./gradlew bootJar -x test
 
       # 5. EC2에 JAR 전송
       - name: SCP JAR to EC2
