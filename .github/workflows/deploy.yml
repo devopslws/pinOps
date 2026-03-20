@@ -35,7 +35,18 @@ jobs:
           chmod +x gradlew
           ./gradlew bootJar -x test
 
-      # 5. EC2에 JAR 전송
+      # 5. EC2 디렉토리 사전 생성
+      - name: Prepare EC2 directory
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            sudo mkdir -p /opt/finops
+            sudo chown ec2-user:ec2-user /opt/finops
+
+      # 6. EC2에 JAR 전송
       - name: SCP JAR to EC2
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -46,7 +57,7 @@ jobs:
           target: "/opt/finops/"
           strip_components: 2   # build/libs/ 경로 제거
 
-      # 6. EC2 환경변수 파일 갱신 + 서비스 재시작
+      # 7. EC2 환경변수 파일 갱신 + 서비스 재시작
       - name: Deploy & Restart
         uses: appleboy/ssh-action@v1.0.3
         with:
