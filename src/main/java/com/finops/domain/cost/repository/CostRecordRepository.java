@@ -14,6 +14,9 @@ public interface CostRecordRepository extends JpaRepository<CostRecord, Long> {
     List<CostRecord> findByTenantIdAndBillingPeriodStartBetween(
             Long tenantId, LocalDate from, LocalDate to);
 
+    void deleteByTenantIdAndBillingPeriodStartBetween(
+            Long tenantId, LocalDate from, LocalDate to);
+
     // 서비스별 비용 집계 (대시보드용)
     @Query("""
         SELECT c.serviceName, SUM(c.billedCost)

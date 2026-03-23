@@ -524,7 +524,9 @@
     const btn = document.getElementById('logoutBtn');
     if (accessToken) {
       try {
-        const payload = JSON.parse(atob(accessToken.split('.')[1]));
+        const base64url = accessToken.split('.')[1];
+        const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(base64url.length / 4) * 4, '=');
+        const payload = JSON.parse(atob(base64));
         el.innerHTML = `<span class="token-badge">✓ ${payload.sub} (${payload.role})</span>`;
         btn.style.display = 'inline-block';
         applyRoleBasedUI(payload.role);

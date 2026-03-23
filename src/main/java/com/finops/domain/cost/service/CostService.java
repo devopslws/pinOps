@@ -26,6 +26,7 @@ public class CostService {
     @Transactional
     public int syncFromAws(LocalDate from, LocalDate to) {
         Long tenantId = TenantContext.getTenantId();
+        costRecordRepository.deleteByTenantIdAndBillingPeriodStartBetween(tenantId, from, to);
         List<CostRecord> records = costExplorerClient.fetchAndNormalize(tenantId, from, to);
         costRecordRepository.saveAll(records);
         return records.size();
